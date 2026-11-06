@@ -23,6 +23,7 @@ public class BffController implements AuthApi {
         this.servletRequest = servletRequest;
         users.put("editor", "editor");
         users.put("student", "student");
+        users.put("admin", "admin");
     }
 
     @Override
@@ -50,7 +51,13 @@ public class BffController implements AuthApi {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Сначала выполните login");
         }
         session.removeAttribute(PENDING_USER);
-        UserRole role = "editor".equals(username) ? UserRole.EDITOR : UserRole.STUDENT;
+        UserRole role;
+        switch (username) {
+            case "admin" -> role = UserRole.ADMIN;
+            case "supervisor" -> role = UserRole.SUPERVISOR;
+            case "technician" -> role = UserRole.TECHNICIAN;
+            default -> role = null;
+        }
         return ResponseEntity.ok(new UserProfileResponse(
                 UUID.nameUUIDFromBytes(username.getBytes(StandardCharsets.UTF_8)),
                 username, null, null, null, role));
