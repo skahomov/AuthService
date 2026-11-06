@@ -6,6 +6,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public enum UserRole {
 
     @Schema(description = "Администратор")
+    EDITOR,
+    STUDENT,
+
     ADMIN,
 
     @Schema(description = "Супервайзер")

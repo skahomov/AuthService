@@ -22,6 +22,6 @@ public record LoginRequest(
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
         @NotBlank(message = "Пароль обязателен")
-        @Size(min = 8, max = 128, message = "Пароль должен быть от 8 до 128 символов")
+        @Size(min = 1, max = 128, message = "Пароль должен быть от 1 до 128 символов")
         String password
 ) {}
