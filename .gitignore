@@ -84,6 +84,7 @@ desktop.ini
 .vscode/
 *.code-workspace
 .factorypath
+.idea
 
 # ===========================
 # Прочее
