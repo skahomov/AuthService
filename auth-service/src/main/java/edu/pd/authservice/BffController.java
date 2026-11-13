@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 public class BffController implements AuthApi {
+    private static final String VALID_OTP = "111111";
     private static final String PENDING_USER = "pendingUser";
     private final ConcurrentHashMap<String, String> users = new ConcurrentHashMap<>();
     private final HttpServletRequest servletRequest;
@@ -37,18 +38,21 @@ public class BffController implements AuthApi {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Неверный логин или пароль");
         }
         servletRequest.getSession(true).setAttribute(PENDING_USER, request.username());
-        return new LoginResponse("OTP_REQUIRED", "Введите любой непустой OTP-код", null);
+        return new LoginResponse("OTP_REQUIRED", "Введите OTP-код", null);
     }
 
     @Override
     public ResponseEntity<UserProfileResponse> verifyOtp(OtpVerifyRequest request) {
         if (request == null || request.otp() == null || request.otp().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP-код обязателен");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Неверный OTP-код");
         }
         HttpSession session = servletRequest.getSession(false);
         String username = session == null ? null : (String) session.getAttribute(PENDING_USER);
         if (username == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Сначала выполните login");
+        }
+        if (!VALID_OTP.equals(request.otp())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Неверный OTP-код");
         }
         session.removeAttribute(PENDING_USER);
         UserRole role;

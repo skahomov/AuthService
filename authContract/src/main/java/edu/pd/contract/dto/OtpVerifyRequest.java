@@ -9,10 +9,10 @@ public record OtpVerifyRequest(
 
         @Schema(
                 description = "Одноразовый OTP-код",
-                example = "123456",
+                example = "111111",
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
-        @NotBlank(message = "OTP-код обязателен")
-        @Pattern(regexp = "^\\d{4,8}$", message = "OTP-код должен состоять из 4–8 цифр")
+        @NotBlank(message = "Неверный OTP-код")
+        @Pattern(regexp = "^\\d{6}$", message = "Неверный OTP-код: ожидаются 6 цифр")
         String otp
 ) {}

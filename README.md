@@ -6,47 +6,40 @@
 
 Спецификация(-и): https://docs.google.com/document/d/1OfXEJSaqzQ-3Bl1xqKrCCcxUZfrOHL5NcbYIplVB9l4/edit?usp=sharing
 Актуальность: N/A
-## Учебный gateway и BFF
+## Проверка OTP
 
-Требуются JDK 21 и Maven. Из корня проекта:
-
-```shell
-mvn clean package
-```
-
-Запустите в двух терминалах:
+Требуются JDK 21 и Maven. Из корня: `mvn clean package`.
+Запуск в двух терминалах:
 
 ```shell
 java -jar auth-service/target/auth-service-1.0-SNAPSHOT.jar
-```
-
-```shell
 java -jar gateway-service/target/gateway-service-1.0-SNAPSHOT.jar
 ```
 
 Gateway: http://localhost:8080; auth-service: http://localhost:8081.
-Маршрут `/api/auth/**` сохраняет исходный путь. Адрес auth-service можно изменить
-переменной окружения `AUTH_SERVICE_URL`.
-В gateway ровно один Java-файл: `SecurityConfig.java`; он также содержит точку запуска.
+Единственный допустимый OTP: строка `111111` (без пробелов).
+Сначала выполните login и сохраните cookie AUTHSESSION, затем передайте её при verifyOtp.
+Например в PowerShell:
 
-Пример проверки (в Windows используйте `curl.exe`):
-
-```shell
-curl -i -c cookies.txt -H "Content-Type: application/json" -d '{"username":"editor","password":"editor"}' http://localhost:8080/api/auth/login
-curl -i -b cookies.txt -H "Content-Type: application/json" -d '{"otp":"anything"}' http://localhost:8080/api/auth/otp/verify
+```powershell
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -WebSession $session -ContentType 'application/json' -Body '{"username":"admin","password":"admin"}'
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/otp/verify -WebSession $session -ContentType 'application/json' -Body '{"otp":"111111"}'
 ```
 
-Учётные записи: editor/editor → EDITOR, student/student → STUDENT.
-Login возвращает OTP_REQUIRED, неверные данные — 401. Cookie AUTHSESSION связывает
-OTP с пользователем. Без успешного login verifyOtp возвращает 401; пустой OTP — 400.
-Любой непустой OTP принимается; после успешного verifyOtp ожидание кода удаляется.
-Профиль содержит username, role и стабильный учебный UUID; остальные поля — null.
-Это только два учебных шага: создание SecurityContext после OTP не реализовано.
-Остальные методы BffController выбрасывают UnsupportedOperationException("TODO").
-Gateway разрешает без аутентификации только login и otp/verify и игнорирует для них CSRF;
-остальные маршруты требуют аутентификации, CSRF для них остаётся включённым.
+- `111111` после login: 200 и UserProfileResponse.
+- Другой шестизначный код: 401 и `detail: "Неверный OTP-код"`.
+- Пустой, отсутствующий код, неверный формат или некорректный JSON: 400 с понятным сообщением.
+- Правильный код без предварительного login: 401.
+- После ошибки кода можно повторить попытку с той же cookie; после успеха ожидание OTP удаляется.
 
-В контракте разрешены короткие учебные пароли и произвольный непустой OTP,
-в UserRole добавлены EDITOR и STUDENT. Из зависимости auth-service на контракт
-исключены JPA и security starter, чтобы не требовалась БД и не включалась вторая
-автоматическая цепочка безопасности. Security находится в gateway.
+Обработчик BffExceptionHandler возвращает контрактный ErrorResponse, включая detail и
+fieldErrors для ошибок валидации. Код и пароль в ответах об ошибке не повторяются.
+Пользователи и роли сохранены из актуального архива. Остальные операции остаются TODO.
+В SecurityConfig восстановлена точка запуска gateway и добавлен throws Exception,
+необходимый для компиляции SecurityFilterChain. В pom.xml gateway восстановлен
+Spring Cloud BOM 2025.1.0 для разрешения версии gateway starter.
+
+Проверки: `mvn test` (из корня).
+
+Проверено: сборка всех модулей, 19 тестов OTP (без ошибок), HTTP-запросы через gateway.
