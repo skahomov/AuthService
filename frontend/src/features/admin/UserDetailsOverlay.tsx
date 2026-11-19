@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { getRolePermissions, setRole, setRolePermissions } from '../../api/usersApi';
 import { ALL_PERMISSIONS } from '../../api/mock/mockData';
 import { useSnackbar } from '../../components/SnackbarProvider';
+import { permissionLabel } from '../../lib/permissions';
 import { formatFullName, getInitials, ROLE_LABELS, ROLE_OPTIONS } from '../../lib/roles';
 import type { User, UserRole } from '../../types';
 
@@ -196,7 +197,14 @@ export default function UserDetailsOverlay({ user, onClose, onUserUpdated }: Use
                         }
                       />
                     }
-                    label={<Typography variant="body2">{permission.name}</Typography>}
+                    label={
+                      <Box>
+                        <Typography variant="body2">{permissionLabel(permission.name)}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {permission.name}
+                        </Typography>
+                      </Box>
+                    }
                   />
                 ))}
               </FormGroup>

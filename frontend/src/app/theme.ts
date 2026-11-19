@@ -17,5 +17,12 @@ export const theme = createTheme({
         root: { textTransform: 'none', fontWeight: 600 },
       },
     },
+    MuiCheckbox: {
+      styleOverrides: {
+        // Чекбокс наследует shape.borderRadius (10) и выглядит почти круглым —
+        // возвращаем привычную квадратную форму.
+        root: { borderRadius: 4 },
+      },
+    },
   },
 });
