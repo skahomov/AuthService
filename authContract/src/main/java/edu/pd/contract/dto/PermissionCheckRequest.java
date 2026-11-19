@@ -19,8 +19,8 @@ public record PermissionCheckRequest(
         UUID userId,
 
         @Schema(
-                description = "Проверяемое право, например checklist.approve_item",
-                example = "checklist.approve_item",
+                description = "Проверяемое право, например checklist:update",
+                example = "checklist:update",
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
         @NotBlank(message = "Наименование права обязательно")

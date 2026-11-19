@@ -61,7 +61,7 @@ public interface AuthApi {
 
     @Operation(
             summary = "Проверить конкретное право",
-            description = "Сервис-сервис операция. Проверяет, разрешено ли пользователю конкретное право, например checklist.approve_item.",
+            description = "Сервис-сервис операция. Проверяет, разрешено ли пользователю конкретное право, например checklist:update.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_SERVICE)
     )
     @ApiResponse(responseCode = "200", description = "Результат проверки права")
@@ -72,7 +72,7 @@ public interface AuthApi {
 
     @Operation(
             summary = "Аутентификация по логину и паролю",
-            description = "BFF проверяет данные в Keycloak. При успехе Keycloak генерирует OTP, BFF отправляет код пользователю и возвращает статус ожидания OTP.",
+            description = "Проверяет логин и пароль по БД и сохраняет ожидание учебного OTP в HTTP-сессии.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_SESSION)
     )
     @ApiResponse(responseCode = "200", description = "Успешно, ожидайте OTP-код")
@@ -85,13 +85,13 @@ public interface AuthApi {
 
     @Operation(
             summary = "Проверить OTP-код",
-            description = "BFF передаёт OTP в Keycloak. Где и совершается проверка.",
+            description = "Принимает учебный OTP 111111 после login, возвращает профиль и access JWT в заголовке Authorization: Bearer.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_SESSION)
     )
     @ApiResponse(
             responseCode = "200",
-            description = "OTP подтверждён. Установлена HttpOnly cookie сессии.",
-            headers = @Header(name = "Set-Cookie", description = "HttpOnly cookie с идентификатором сессии")
+            description = "OTP подтверждён. Профиль в теле, JWT в заголовке Authorization.",
+            headers = @Header(name = "Authorization", description = "Bearer access JWT для CORE")
     )
     @ApiResponse(responseCode = "400", description = "Ошибка валидации",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
