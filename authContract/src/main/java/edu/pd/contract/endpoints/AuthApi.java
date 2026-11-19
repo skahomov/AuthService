@@ -112,7 +112,7 @@ public interface AuthApi {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping(value = "/registration", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('SUPERVISOR','ADMIN')")
+    @PreAuthorize("hasAuthority('auth.registration')")
     ResponseEntity<UserProfileResponse> register(@Valid @RequestBody RegistrationRequest request);
 
     @Operation(
@@ -154,7 +154,7 @@ public interface AuthApi {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/users/{id}/lock")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('SUPERVISOR','ADMIN')")
+    @PreAuthorize("hasAuthority('auth.lockUser')")
     ResponseEntity<Void> lockUser(
             @Parameter(description = "ID пользователя", required = true, example = "1")
             @PathVariable UUID id
@@ -172,7 +172,7 @@ public interface AuthApi {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/users/{id}/unlock")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('SUPERVISOR','ADMIN')")
+    @PreAuthorize("hasAuthority('auth.unlockUser')")
     ResponseEntity<Void> unlockUser(
             @Parameter(description = "ID пользователя", required = true, example = "1")
             @PathVariable UUID id

@@ -49,7 +49,7 @@ public interface RoleApi {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping(value = "/role/create", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('auth.createRole')")
     ResponseEntity<RoleResponse> createRole(@Valid @RequestBody RoleCreateRequest request);
 
     @Operation(
@@ -64,7 +64,7 @@ public interface RoleApi {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @DeleteMapping("/role/{id}/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('auth.deleteRole')")
     ResponseEntity<Void> deleteRole(
             @Parameter(description = "ID роли", required = true) @PathVariable UUID id
     );
@@ -78,7 +78,7 @@ public interface RoleApi {
     @ApiResponse(responseCode = "400", description = "Ошибка валидации",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping(value = "/role/{id}/set-permits", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('auth.setRolePermit')")
     ResponseEntity<Void> setRolePermissions(
             @Parameter(description = "ID роли", required = true) @PathVariable UUID id,
             @Valid @RequestBody RolePermissionsRequest request
@@ -93,7 +93,7 @@ public interface RoleApi {
     @ApiResponse(responseCode = "400", description = "Ошибка валидации",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping(value = "/role/{id}/revoke-permits", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('auth.revokeRolePermit')")
     ResponseEntity<Void> revokeRolePermissions(
             @Parameter(description = "ID роли", required = true) @PathVariable UUID id,
             @Valid @RequestBody RolePermissionsRequest request

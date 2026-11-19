@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
         value = "/api/auth",
         produces = MediaType.APPLICATION_JSON_VALUE
 )
-public interface PremissionsApi {
+public interface PermissionsApi {
 
     String SECURITY_SCHEME_SERVICE = "serviceBearer";
     String SECURITY_SCHEME_SESSION = "sessionCookie";
@@ -48,7 +48,7 @@ public interface PremissionsApi {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping(value = "/permits/create", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('auth.createPermit')")
     ResponseEntity<PermissionResponse> createPermission(@Valid @RequestBody PermissionCreateRequest request);
 
     @Operation(
@@ -63,7 +63,7 @@ public interface PremissionsApi {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @DeleteMapping("/permits/{id}/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('auth.deletePermit')")
     ResponseEntity<Void> deletePermission(
             @Parameter(description = "ID права", required = true) @PathVariable UUID id
     );
