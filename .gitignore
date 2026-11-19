@@ -62,6 +62,8 @@ failsafe-reports/
 jacoco.exec
 *.exec
 coverage/
+.local/
+**/.local/
 
 # ===========================
 # OS (файлы операционных систем)
