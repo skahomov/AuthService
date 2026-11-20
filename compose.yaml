@@ -4,13 +4,13 @@ services:
     container_name: postgres-auth-service
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-hcc_auth}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hcc_auth}
-      POSTGRES_DB: ${POSTGRES_DB:-hcc_auth}
+      POSTGRES_USER: ${DB_USER:-hcc_auth}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-hcc_auth}
+      POSTGRES_DB: ${DB_NAME:-hcc_auth}
       PGDATA: /var/lib/postgresql/data/pgdata
       TZ: ${TZ:-UTC}
     ports:
-      - "${POSTGRES_PORT:-5434}:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - auth_pg_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d:ro
