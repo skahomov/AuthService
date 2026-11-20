@@ -6,10 +6,56 @@
 
 Спецификация(-и): https://docs.google.com/document/d/1OfXEJSaqzQ-3Bl1xqKrCCcxUZfrOHL5NcbYIplVB9l4/edit?usp=sharing
 Актуальность: N/A
+## Соответствие UUID-миграциям
+
+Во всех пяти основных таблицах ID — UUID; ROLE_ID/USER_ID также UUID.
+UUID создаются приложением (UUID.randomUUID), BIGSERIAL/BIGINT в новых миграциях нет.
+Три исходных индекса сохранены. В миграции 03 добавлены таблица ROLE_PERMISSIONS
+с составным ключом из двух UUID и внешние ключи связей.
+
+AppUser отображает LOGIN, FULL_NAME, PHONE, STATUS, FAILED_LOGIN_ATTEMPTS,
+BLOCKED_UNTIL, CREATED_AT, UPDATED_AT; размеры и обязательность полей совпадают с SQL.
+Role/Permission также отображают CREATED_AT и UPDATED_AT. В Java-сущности
+поле username оставлено ради совместимости API, а в БД оно отображается на LOGIN.
+API-поля firstName/lastName вычисляются из FULL_NAME: первое слово и остальная часть.
+Учебные ФИО хранятся в порядке «имя фамилия». Отдельных колонок first_name/last_name нет.
+
+ACTIVE — рабочее значение STATUS для начальных пользователей. Любое другое значение
+запрещает вход; будущий BLOCKED_UNTIL также запрещает вход. Ошибки пароля увеличивают
+FAILED_LOGIN_ATTEMPTS, успешный пароль сбрасывает счётчик. Автоматические пороги
+блокировки не вводились: миграции не задают таких правил.
+
+OTP 111111 хранится как BCrypt-хеш в OTP_CODES. Срок — 5 минут в UTC; каждая дошедшая
+до сверки хеша попытка увеличивает ATTEMPTS (включая успешную). При успехе USED=true.
+Проверка блокирует запись OTP на время транзакции: повторное применение исключено.
+Сессия хранит UUID пользователя и конкретной записи OTP, не само значение кода.
+Неверный код не откатывает счётчик; отсутствующий/невалидный JSON отсеивается валидацией.
+RefreshToken и RefreshTokenRepository соответствуют REFRESH_TOKENS; выпуск и обновление
+refresh-токенов не добавлялись, так как ранее такие ручки не входили в задание.
+
+### Применение миграций
+
+Для новой пустой БД используйте обычный запуск ниже: Flyway применит версии
+2026.06.11.01, 2026.06.11.02 и 2026.06.11.03, Hibernate выполнит validate.
+Миграция создания таблиц исправлена под уточнённое условие UUID.
+
+Если в БД уже применялся прежний вариант с BIGSERIAL или V1__auth_schema.sql,
+этот архив не выполняет автоматическое преобразование существующих данных или истории
+Flyway. Для такой БД требуется отдельная переходная миграция с сохранением связей и
+согласованием flyway_schema_history. Не удаляйте данные и не запускайте repair как
+замену преобразованию типов: repair не конвертирует BIGINT в UUID.
+Если актуальные UUID-миграции уже были применены, сверяйте их исходные SQL/checksum
+с историей перед заменой файлов. Существующие FK требуют отсутствия сиротских ссылок.
+
+В текущем архиве также устранены блокировавшие сборку дубликаты SecurityConfig в gateway,
+самоссылка java.version и явно закреплённые несовместимые версии Gateway/Boot plugin.
+Фронтенд не изменялся. Healthcheck PostgreSQL использует те же имя базы и пользователя,
+что и конфигурация контейнера.
+
 ## Выполненные задания AUTH
 
 Добавлены Swagger/OpenAPI в auth-service, PostgreSQL, Flyway, JPA-сущности
-пользователя/роли/права и репозитории. Login, OTP, `/verify` и `/permissions/check`
+пользователя/роли/права/OTP/refresh-токена и репозитории. Login, OTP, `/verify` и `/permissions/check`
 обращаются к БД через AuthService. Пароли в БД хранятся как BCrypt-хеши.
 Другие контроллеры и CRUD-операции не реализовывались: существующие TODO сохранены.
 
@@ -25,11 +71,11 @@ mvn clean package
 В двух терминалах:
 
 ```shell
-java -jar auth-service/target/auth-service-1.0-SNAPSHOT.jar
+java -jar auth-service/target/auth-service-0.0.1.jar
 ```
 
 ```shell
-java -jar gateway-service/target/gateway-service-1.0-SNAPSHOT.jar
+java -jar gateway-service/target/gateway-service-0.0.1.jar
 ```
 
 - auth-service: http://localhost:8081
@@ -39,12 +85,12 @@ java -jar gateway-service/target/gateway-service-1.0-SNAPSHOT.jar
 - JWKS: http://localhost:8081/.well-known/jwks.json (также через gateway)
 - PostgreSQL: localhost:5434, база/пользователь/локальный пароль `hcc_auth`.
 
-Flyway создаёт таблицы `auth_users`, `auth_roles`, `auth_permissions`,
-`auth_role_permissions`; Hibernate проверяет соответствие сущностей схеме.
+Flyway создаёт таблицы `users`, `roles`, `permissions`,
+`role_permissions`, `otp_codes`, `refresh_tokens`; Hibernate проверяет соответствие сущностей схеме.
 Пример SQL-проверки после запуска:
 
 ```shell
-docker compose exec postgres psql -U hcc_auth -d hcc_auth -c "SELECT u.id, u.username, r.name AS role FROM auth_users u JOIN auth_roles r ON r.id = u.role_id;"
+docker compose exec postgres psql -U hcc_auth -d hcc_auth -c "SELECT u.id, u.login, r.name AS role FROM users u JOIN roles r ON r.id = u.role_id;"
 ```
 
 ### Учебные данные
@@ -62,7 +108,7 @@ docker compose exec postgres psql -U hcc_auth -d hcc_auth -c "SELECT u.id, u.use
 
 Это локальная начальная матрица. Документ HCC задаёт имена permissions и полный
 доступ ADMIN, но не фиксирует права SUPERVISOR/TECHNICIAN. Назначения хранятся в БД
-и могут быть изменены в `auth_role_permissions`. CRUD ролей/прав — вне задания.
+и могут быть изменены в `role_permissions`. CRUD ролей/прав — вне задания.
 Для существующей БД перед применением миграции проверьте, что эти таблицы ещё не
 созданы вручную; Flyway не изменяет чужую схему и не использует baseline автоматически.
 
@@ -86,7 +132,7 @@ $permissionBody = @{ userId = $profile.id; permission = 'checklist:archive' } | 
 Invoke-RestMethod -Method Post -Uri "$base/api/auth/permissions/check" -Headers $headers -ContentType 'application/json' -Body $permissionBody
 ```
 
-Login сверяет пароль с хешем из БД и создаёт ожидание OTP в сессии на 5 минут.
+Login сверяет пароль с хешем из БД, создаёт запись в otp_codes и сохраняет её UUID в сессии на 5 минут.
 Только код `111111` допустим. Неверный код → 401 с `detail`, неверный формат → 400.
 Ошибка кода позволяет повторить попытку с той же cookie. Успешное ожидание потребляется
 один раз; профиль берётся из БД, access JWT возвращается в заголовке
@@ -124,7 +170,7 @@ AUTH_USER_ID_CLAIM=user_id
 
 В сетевом окружении задайте реальный issuer и доступные CORE URL. Если CORE сам
 использует порт 8080, запустите наш gateway на другом порту, например:
-`java -jar gateway-service/target/gateway-service-1.0-SNAPSHOT.jar --server.port=8088`.
+`java -jar gateway-service/target/gateway-service-0.0.1.jar --server.port=8088`.
 
 Реализован только необходимый для задания JWT-поток login → OTP → access JWT
 и JWKS для проверки подписи. OIDC Authorization Code + PKCE, Discovery,
@@ -161,7 +207,10 @@ refresh token и прочие операции из полного плана HC
 PostgreSQL, HTTP login/OTP/verify/permissions, Swagger/JWKS и отрицательные сценарии
 JWT (подпись, kid, issuer, audience, срок действия, UUID), повторное чтение ключа и ротацию.
 
-Результат проверки: сборка всех модулей и 28 автоматических тестов прошли.
+Результат проверки: сборка всех модулей и 34 автоматических тестов прошли.
 Дополнительно выполнен запуск auth-service + gateway с настоящим PostgreSQL 17:
 миграция, заполнение БД, login → OTP → JWT → verify → permissions/check,
 публичный JWKS, отказ без Bearer и отсутствие права archive у TECHNICIAN проверены.
+
+Проверка актуальной UUID-схемы: 34 теста, реальный PostgreSQL 17, 3 миграции,
+3 исходных индекса, 5 FK, хеш/ATTEMPTS/USED для OTP и HTTP-цепочка через gateway — успешно.

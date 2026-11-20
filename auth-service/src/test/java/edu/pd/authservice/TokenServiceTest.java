@@ -34,7 +34,7 @@ class TokenServiceTest {
 
     @Test
     void issuedClaimsMatchHccAndKeySurvivesRestart() throws Exception {
-        var user = new AppUser("user", "hash", new Role(UserRole.TECHNICIAN, List.of(new Permission("checklist:read"))));
+        var user = new AppUser("user", "hash", "Test User", "+79000000000", new Role(UserRole.TECHNICIAN, List.of(new Permission("checklist:read"))));
         String token = service.issue(user);
         var restarted = new TokenService(directory.resolve("keys.json").toString(), "", "http://auth.test", "hcc-logic-service", 900);
         var jwt = restarted.decode(token);
@@ -63,7 +63,7 @@ class TokenServiceTest {
         Files.writeString(directory.resolve("keys.json"), new JWKSet(List.of(next, key.toPublicJWK())).toString(false));
         var rotated = new TokenService(directory.resolve("keys.json").toString(), "next", "http://auth.test", "hcc-logic-service", 900);
         assertNotNull(rotated.decode(old));
-        var user = new AppUser("user", "hash", new Role(UserRole.ADMIN, List.of()));
+        var user = new AppUser("user", "hash", "Test User", "+79000000000", new Role(UserRole.ADMIN, List.of()));
         assertEquals("next", SignedJWT.parse(rotated.issue(user)).getHeader().getKeyID());
     }
 

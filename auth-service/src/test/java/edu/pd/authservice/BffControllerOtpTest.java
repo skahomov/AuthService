@@ -30,6 +30,9 @@ class BffControllerOtpTest {
     static void keys(DynamicPropertyRegistry registry) { registry.add("auth.jwt.key-file", KEY_FILE::toString); }
     @Value("${local.server.port}") private int port;
     @Autowired private UserRepository users;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired private edu.pd.authservice.service.AuthService auth;
+    @Autowired private edu.pd.authservice.repository.RefreshTokenRepository refreshTokens;
     private final ObjectMapper json = new ObjectMapper();
     private HttpClient client;
     @BeforeEach void client() {
@@ -115,5 +118,60 @@ class BffControllerOtpTest {
                 assertEquals("RSA", key.get("kty").asText()); assertNull(key.get("d")); assertNotNull(key.get("kid"));
             }
         }
+    }
+
+    private UUID latestCode(UUID userId) {
+        return jdbc.queryForObject("select id from otp_codes where user_id = ? order by created_at desc limit 1", UUID.class, userId);
+    }
+    @Test void otpHashAttemptsAndConsumptionAreStoredInDatabase() throws Exception {
+        login("admin");
+        UUID userId = users.findByUsername("admin").orElseThrow().getId();
+        UUID id = latestCode(userId);
+        String hash = jdbc.queryForObject("select code_hash from otp_codes where id = ?", String.class, id);
+        assertTrue(hash.startsWith("$2")); assertNotEquals("111111", hash);
+        assertEquals(401, otp("222222").statusCode());
+        assertEquals(1, jdbc.queryForObject("select attempts from otp_codes where id = ?", Integer.class, id));
+        assertFalse(jdbc.queryForObject("select used from otp_codes where id = ?", Boolean.class, id));
+        assertEquals(200, otp("111111").statusCode());
+        assertEquals(2, jdbc.queryForObject("select attempts from otp_codes where id = ?", Integer.class, id));
+        assertTrue(jdbc.queryForObject("select used from otp_codes where id = ?", Boolean.class, id));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> auth.verifyOtp(userId, id, "111111"));
+    }
+    @Test void expiredOtpCannotIssueToken() throws Exception {
+        login("admin"); UUID id = latestCode(users.findByUsername("admin").orElseThrow().getId());
+        jdbc.update("update otp_codes set expires_at = ? where id = ?", java.time.LocalDateTime.now(java.time.Clock.systemUTC()).minusMinutes(1), id);
+        var response = otp("111111"); assertEquals(401, response.statusCode());
+        assertTrue(json.readTree(response.body()).get("detail").asText().contains("истёк"));
+        assertFalse(jdbc.queryForObject("select used from otp_codes where id = ?", Boolean.class, id));
+    }
+    @Test void failedLoginCounterPersistsAndResetsAfterSuccess() throws Exception {
+        UUID id = users.findByUsername("admin").orElseThrow().getId();
+        int before = jdbc.queryForObject("select failed_login_attempts from users where id = ?", Integer.class, id);
+        assertEquals(401, post("/api/auth/login", "{\"username\":\"admin\",\"password\":\"wrong\"}", null).statusCode());
+        assertEquals(before + 1, jdbc.queryForObject("select failed_login_attempts from users where id = ?", Integer.class, id));
+        login("admin");
+        assertEquals(0, jdbc.queryForObject("select failed_login_attempts from users where id = ?", Integer.class, id));
+    }
+    @Test void blockedUntilPreventsLogin() throws Exception {
+        UUID id = users.findByUsername("admin").orElseThrow().getId();
+        jdbc.update("update users set blocked_until = ? where id = ?", java.time.LocalDateTime.now(java.time.Clock.systemUTC()).plusMinutes(1), id);
+        try {
+            assertEquals(401, post("/api/auth/login", "{\"username\":\"admin\",\"password\":\"admin\"}", null).statusCode());
+        } finally { jdbc.update("update users set blocked_until = null where id = ?", id); }
+    }
+    @Test void refreshTokenEntityMatchesMigrationWithoutAddingEndpoint() {
+        AppUser user = users.findByUsername("admin").orElseThrow();
+        var token = refreshTokens.saveAndFlush(new edu.pd.authservice.entity.RefreshToken(user, "test-hash", java.time.LocalDateTime.now(java.time.Clock.systemUTC()).plusHours(1)));
+        assertNotNull(token.getId());
+        assertFalse(refreshTokens.findById(token.getId()).orElseThrow().isRevoked());
+        token.revoke(); refreshTokens.saveAndFlush(token);
+        assertTrue(refreshTokens.findById(token.getId()).orElseThrow().isRevoked());
+    }
+    @Test void fullNameAndRequiredPhoneArePopulatedAndMapped() throws Exception {
+        login("admin"); var profile = json.readTree(otp("111111").body());
+        assertEquals("admin", profile.get("firstName").asText());
+        assertEquals("User", profile.get("lastName").asText());
+        assertFalse(profile.get("phone").asText().isBlank());
+        assertEquals(0, jdbc.queryForObject("select count(*) from users where full_name is null or phone is null or status is null", Integer.class));
     }
 }

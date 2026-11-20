@@ -5,8 +5,8 @@ import jakarta.persistence.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "auth_permissions")
-public class Permission {
+@Table(name = "permissions")
+public class Permission extends AuditedEntity {
     @Id
     private UUID id;
     @Column(nullable = false, unique = true)
