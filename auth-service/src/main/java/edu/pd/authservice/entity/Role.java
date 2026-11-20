@@ -6,15 +6,15 @@ import jakarta.persistence.*;
 import java.util.*;
 
 @Entity
-@Table(name = "auth_roles")
-public class Role {
+@Table(name = "roles")
+public class Role extends AuditedEntity {
     @Id
     private UUID id;
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, unique = true, length = 32)
+    @Column(nullable = false, unique = true, length = 30)
     private UserRole name;
     @ManyToMany
-    @JoinTable(name = "auth_role_permissions", joinColumns = @JoinColumn(name = "role_id"),
+    @JoinTable(name = "permissions", joinColumns = @JoinColumn(name = "role_id"),
             inverseJoinColumns = @JoinColumn(name = "permission_id"))
     private Set<Permission> permissions = new HashSet<>();
 

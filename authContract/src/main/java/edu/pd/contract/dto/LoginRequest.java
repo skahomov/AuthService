@@ -13,7 +13,7 @@ public record LoginRequest(
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
         @NotBlank(message = "Логин обязателен")
-        @Size(max = 255, message = "Логин не должен превышать 255 символов")
+        @Size(max = 100, message = "Логин не должен превышать 100 символов")
         String username,
 
         @Schema(

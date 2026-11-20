@@ -14,6 +14,7 @@ import java.util.UUID;
 @RestController
 public class BffController implements AuthApi {
     private static final String PENDING_USER = "pendingUserId";
+    private static final String PENDING_CODE = "pendingOtpId";
     private final edu.pd.authservice.service.AuthService auth;
     private final HttpServletRequest servletRequest;
 
@@ -26,10 +27,11 @@ public class BffController implements AuthApi {
     public LoginResponse login(LoginRequest request) {
         HttpSession previous = servletRequest.getSession(false);
         if (previous != null) previous.invalidate();
-        UUID userId = auth.login(request);
+        var challenge = auth.login(request);
         HttpSession session = servletRequest.getSession(true);
         session.setMaxInactiveInterval(300);
-        session.setAttribute(PENDING_USER, userId);
+        session.setAttribute(PENDING_USER, challenge.userId());
+        session.setAttribute(PENDING_CODE, challenge.codeId());
         return new LoginResponse("OTP_REQUIRED", "Введите OTP-код", null);
     }
 
@@ -40,9 +42,11 @@ public class BffController implements AuthApi {
         // Serialize concurrent attempts: a successful pending login can issue only one token.
         synchronized (session) {
             UUID userId = (UUID) session.getAttribute(PENDING_USER);
-            if (userId == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Сначала выполните login");
-            var result = auth.verifyOtp(userId, request.otp());
+            UUID codeId = (UUID) session.getAttribute(PENDING_CODE);
+            if (userId == null || codeId == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Сначала выполните login");
+            var result = auth.verifyOtp(userId, codeId, request.otp());
             session.removeAttribute(PENDING_USER);
+            session.removeAttribute(PENDING_CODE);
             return ResponseEntity.ok().header("Authorization", "Bearer " + result.token())
                     .header("Cache-Control", "no-store").header("Pragma", "no-cache").body(result.profile());
         }

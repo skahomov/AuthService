@@ -37,10 +37,13 @@ public class DatabaseConfig {
                             rights.get("checklist:create"), rights.get("checklist:update")))));
             Role technician = roles.findByName(UserRole.TECHNICIAN).orElseGet(() ->
                     roles.save(new Role(UserRole.TECHNICIAN, List.of(rights.get("checklist:read"), rights.get("checklist:update")))));
-            Map<String, Role> accounts = Map.of("admin", admin, "supervisor", supervisor,
-                    "technician", technician, "editor", supervisor, "student", technician);
+            Map<String, Role> accounts = new java.util.TreeMap<>(Map.of("admin", admin, "supervisor", supervisor,
+                    "technician", technician, "editor", supervisor, "student", technician));
+            java.util.concurrent.atomic.AtomicInteger phoneSuffix = new java.util.concurrent.atomic.AtomicInteger(1);
             accounts.forEach((name, role) -> {
-                if (users.findByUsername(name).isEmpty()) users.save(new AppUser(name, passwords.encode(name), role));
+                String phone = "+7900000000" + phoneSuffix.getAndIncrement();
+                if (users.findByUsername(name).isEmpty())
+                    users.save(new AppUser(name, passwords.encode(name), name + " User", phone, role));
             });
         });
     }

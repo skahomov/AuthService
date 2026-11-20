@@ -6,15 +6,11 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
-@SpringBootApplication
+@org.springframework.context.annotation.Configuration
 public class SecurityConfig {
 
-    public static void main(String[] args) {
-        SpringApplication.run(SecurityConfig.class, args);
-    }
-
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/auth/login", "/api/auth/otp/verify", "/.well-known/jwks.json").permitAll()

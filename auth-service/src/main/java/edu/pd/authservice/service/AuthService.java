@@ -2,6 +2,9 @@ package edu.pd.authservice.service;
 
 import edu.pd.authservice.entity.AppUser;
 import edu.pd.authservice.repository.UserRepository;
+import edu.pd.authservice.repository.OtpCodeRepository;
+import edu.pd.authservice.entity.OtpCode;
+import java.time.*;
 import edu.pd.contract.dto.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,26 +22,44 @@ public class AuthService {
     private final PasswordEncoder passwords;
     private final TokenService tokens;
 
-    public AuthService(UserRepository users, PasswordEncoder passwords, TokenService tokens) {
+    private final OtpCodeRepository codes;
+    public AuthService(UserRepository users, PasswordEncoder passwords, TokenService tokens, OtpCodeRepository codes) {
         this.users = users;
         this.passwords = passwords;
         this.tokens = tokens;
+        this.codes = codes;
     }
 
-    public UUID login(LoginRequest request) {
-        AppUser user = users.findByUsername(request.username()).filter(AppUser::isEnabled)
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public LoginChallenge login(LoginRequest request) {
+        AppUser user = users.findForUpdateByUsername(request.username()).filter(AppUser::isEnabled)
                 .orElseThrow(() -> unauthorized("Неверный логин или пароль"));
-        if (!passwords.matches(request.password(), user.getPasswordHash()))
+        if (!passwords.matches(request.password(), user.getPasswordHash())) {
+            user.recordFailedLogin();
             throw unauthorized("Неверный логин или пароль");
-        return user.getId();
+        }
+        user.resetFailedLogins();
+        OtpCode code = codes.save(new OtpCode(user, passwords.encode("111111"),
+                LocalDateTime.now(Clock.systemUTC()).plusMinutes(5)));
+        return new LoginChallenge(user.getId(), code.getId());
     }
 
-    public VerifiedLogin verifyOtp(UUID userId, String otp) {
-        if (!"111111".equals(otp)) throw unauthorized("Неверный OTP-код");
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public VerifiedLogin verifyOtp(UUID userId, UUID codeId, String otp) {
+        OtpCode code = codes.findForUpdate(codeId).orElseThrow(() -> unauthorized("Неверный OTP-код"));
+        if (!code.getUser().getId().equals(userId) || code.isUsed()
+                || !LocalDateTime.now(Clock.systemUTC()).isBefore(code.getExpiresAt()))
+            throw unauthorized("OTP-код недействителен или истёк");
         AppUser user = enabledUser(userId);
-        return new VerifiedLogin(new UserProfileResponse(user.getId(), user.getUsername(),
+        code.recordAttempt();
+        if (otp == null || !passwords.matches(otp, code.getCodeHash())) throw unauthorized("Неверный OTP-код");
+        var result = new VerifiedLogin(new UserProfileResponse(user.getId(), user.getUsername(),
                 user.getFirstName(), user.getLastName(), user.getPhone(), user.getRole().getName()), tokens.issue(user));
+        code.markUsed();
+        return result;
     }
+
+    public record LoginChallenge(UUID userId, UUID codeId) {}
 
     public VerifyTokenResponse verifyToken(String token) {
         try {
