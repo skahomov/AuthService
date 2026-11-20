@@ -14,7 +14,7 @@ public class Role extends AuditedEntity {
     @Column(nullable = false, unique = true, length = 30)
     private UserRole name;
     @ManyToMany
-    @JoinTable(name = "permissions", joinColumns = @JoinColumn(name = "role_id"),
+    @JoinTable(name = "role_permissions", joinColumns = @JoinColumn(name = "role_id"),
             inverseJoinColumns = @JoinColumn(name = "permission_id"))
     private Set<Permission> permissions = new HashSet<>();
 
